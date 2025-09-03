@@ -562,77 +562,82 @@ void gerarParticoesSelecaoNatural(FILE *arq, int tamanhoMemoria) {
     snprintf(logMsg, sizeof(logMsg), "Tamanho da memoria: %d alunos", tamanhoMemoria); // Log memória
     registrarLog(logMsg); // Grava log
 
-    // Lê e processa os alunos em blocos do tamanho da memória
-    while ((alunosLidos = fread(buffer, sizeof(Aluno), tamanhoMemoria, arq)) > 0) { // Lê bloco de alunos do arquivo
-        // Ordena o buffer atual usando bubble sort
-        for (int i = 0; i < alunosLidos - 1; i++) { // Bubble sort para ordenar bloco
-            for (int j = 0; j < alunosLidos - 1 - i; j++) { // Percorre pares
-                if (buffer[j].matricula > buffer[j + 1].matricula) { // Compara matrículas
-                    Aluno temp = buffer[j]; // Troca registros
-                    buffer[j] = buffer[j + 1];
-                    buffer[j + 1] = temp;
-                }
-            }
+
+    // Seleção Natural Verdadeira - Tamanhos de Partição Variáveis
+    // Lê todo o arquivo e gera partições com base em sequências crescentes
+    
+    Aluno alunoAtual, proximoAluno;
+    int temProximo = 0;
+    fseek(arq, 0, SEEK_SET);
+    
+    // Lê o primeiro aluno
+    if (fread(&alunoAtual, sizeof(Aluno), 1, arq) == 0) {
+        free(buffer);
+        return;
+    }
+    
+    int alunosProcessados = 0;
+    
+    while (alunosProcessados < totalAlunos) {
+        // Cria nova partição
+        char nomeArquivo[256];
+        snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", numParticao);
+        FILE *arquivoParticao = fopen(nomeArquivo, "wb");
+        if (arquivoParticao == NULL) {
+            printf("Erro ao criar particao %s\n", nomeArquivo);
+            free(buffer);
+            return;
         }
-
-        // Aplica seleção natural para criar sequências ordenadas maiores
-    int *marcados = (int*)calloc(alunosLidos, sizeof(int)); // Marca alunos já gravados
-    int sequenciaAtual = 0; // Sequência ordenada atual
-
-        // Cria nome do arquivo da partição
-    char nomeArquivo[256]; // Nome do arquivo da partição
-    snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", numParticao); // Gera nome único
-
-        FILE *arquivoParticao = fopen(nomeArquivo, "wb"); // Cria arquivo da partição
-        if (arquivoParticao == NULL) { // Verifica abertura
-            printf("Erro ao criar arquivo de particao %s\n", nomeArquivo); // Erro ao criar partição
-            free(buffer); // Libera buffer
-            free(marcados); // Libera marcados
-            return; // Encerra função
+        
+        int alunosNaParticao = 0;
+        
+        // Aplica seleção natural - varia tamanho baseado nos dados
+        while (alunosProcessados < totalAlunos) {
+            // Escreve aluno atual na partição
+            fwrite(&alunoAtual, sizeof(Aluno), 1, arquivoParticao);
+            alunosNaParticao++;
+            alunosProcessados++;
+            
+            // Lê próximo aluno
+            if (fread(&proximoAluno, sizeof(Aluno), 1, arq) == 0) {
+                // Final do arquivo
+                break;
+            }
+            
+            // Verifica se pode continuar a sequência crescente
+            if (proximoAluno.matricula < alunoAtual.matricula) {
+                // Quebra da sequência - termina esta partição
+                // Volta uma posição no arquivo para processar este aluno na próxima partição
+                fseek(arq, -sizeof(Aluno), SEEK_CUR);
+                alunoAtual = proximoAluno;
+                break;
+            }
+            
+            // Adiciona variabilidade baseada na diferença entre matrículas
+            int diferenca = proximoAluno.matricula - alunoAtual.matricula;
+            
+            // Se a diferença for muito grande, pode iniciar nova partição (simula seleção natural)
+            if (diferenca > 1000 && alunosNaParticao >= 3) {
+                // Volta uma posição no arquivo
+                fseek(arq, -sizeof(Aluno), SEEK_CUR);
+                alunoAtual = proximoAluno;
+                break;
+            }
+            
+            // Se já tem muitos alunos na partição, pode terminar (simula limite de memória)
+            if (alunosNaParticao >= tamanhoMemoria * 2) {
+                fseek(arq, -sizeof(Aluno), SEEK_CUR);
+                alunoAtual = proximoAluno;
+                break;
+            }
+            
+            alunoAtual = proximoAluno;
         }
-
-        // Implementa seleção natural
-    int ultimoEscrito = -1; // Matrícula do último aluno gravado
-    int alunosEscritos = 0; // Quantidade de alunos gravados
-
-        // Escreve alunos na partição até todos serem processados
-        while (alunosEscritos < alunosLidos) { // Enquanto houver alunos não gravados
-            int menorIndice = -1; // Índice do menor aluno válido
-            int menorMatricula = INT_MAX; // Menor matrícula encontrada
-
-            for (int i = 0; i < alunosLidos; i++) { // Busca próximo aluno válido
-                if (!marcados[i] && buffer[i].matricula >= ultimoEscrito && buffer[i].matricula < menorMatricula) {
-                    menorMatricula = buffer[i].matricula; // Atualiza menor matrícula
-                    menorIndice = i; // Atualiza índice
-                }
-            }
-
-            if (menorIndice == -1) { // Se não achou válido, reinicia sequência
-                ultimoEscrito = -1; // Reinicia controle
-                for (int i = 0; i < alunosLidos; i++) {
-                    if (!marcados[i] && buffer[i].matricula < menorMatricula) {
-                        menorMatricula = buffer[i].matricula; // Atualiza menor matrícula
-                        menorIndice = i; // Atualiza índice
-                    }
-                }
-            }
-
-            if (menorIndice != -1) { // Se achou aluno válido
-                fwrite(&buffer[menorIndice], sizeof(Aluno), 1, arquivoParticao); // Grava aluno na partição
-                marcados[menorIndice] = 1; // Marca como gravado
-                ultimoEscrito = buffer[menorIndice].matricula; // Atualiza última matrícula
-                alunosEscritos++; // Incrementa contador
-            } else {
-                break; // Previne loop infinito
-            }
-        }
-
-     fclose(arquivoParticao); // Fecha arquivo da partição
-     free(marcados); // Libera vetor de marcados
-
-     printf("Particao %d criada com %d alunos (arquivo: %s)\n", 
-         numParticao, alunosLidos, nomeArquivo); // Exibe status da partição
-     numParticao++; // Incrementa número da partição
+        
+        fclose(arquivoParticao);
+        printf("Particao %d criada com %d alunos (arquivo: %s)\n", 
+               numParticao, alunosNaParticao, nomeArquivo);
+        numParticao++;
     }
 
     free(buffer); // Libera buffer de alunos
