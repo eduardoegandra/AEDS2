@@ -1,234 +1,242 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h> // Necessário para a função time
-#include <limits.h> // Para INT_MAX
-#include "aluno.h"
-#include "disciplina.h"
+#include <stdio.h>              // Biblioteca para entrada/saída padrão
+#include <stdlib.h>             // Biblioteca para alocação de memória e funções utilitárias
+#include <string.h>             // Biblioteca para manipulação de strings
+#include <time.h>               // Biblioteca para medição de tempo de execução
+#include <limits.h>             // Biblioteca para constantes de limite (INT_MAX)
+#include "aluno.h"              // Header com definições de estruturas e funções de aluno
+#include "disciplina.h"         // Header com definições de disciplina
 
-// Adiciona a declaração externa de qtdDisciplinas, assumindo que está definida em disciplina.c
-extern int qtdDisciplinas;
-extern Disciplina disciplinas[]; // Adiciona a declaração externa do vetor de disciplinas
-#define MAX_ALUNOS 1000000
+// Declarações externas de variáveis definidas em outros módulos
+extern int qtdDisciplinas;       // Quantidade total de disciplinas cadastradas
+extern Disciplina disciplinas[]; // Array de disciplinas disponíveis no sistema
+#define MAX_ALUNOS 1000000      // Limite máximo de alunos suportado pelo sistema
 
-// Variáveis globais removidas - trabalharemos apenas com arquivos (memória secundária)
+// Estratégia: todas operações trabalham diretamente com arquivos (memória secundária)
 
-// Registra uma mensagem no arquivo de log
+// Função para registrar operações em arquivo de log para auditoria
 void registrarLog(char *mensagem) {
-    FILE *logFile = fopen("buscas.log", "a"); // Abre o arquivo de log em modo de adição
-    if (logFile != NULL) {
-        fprintf(logFile, "%s\n", mensagem); // Escreve a mensagem no arquivo
-        fclose(logFile); // Fecha o arquivo de log
-    } else {
-        printf("Erro ao abrir o arquivo de log.\n"); // Exibe erro se não conseguir abrir
+    FILE *logFile = fopen("buscas.log", "a"); // Abre arquivo de log em modo append
+    if (logFile != NULL) {                    // Verifica se abertura foi bem-sucedida
+        fprintf(logFile, "%s\n", mensagem);   // Escreve mensagem com quebra de linha
+        fclose(logFile);                      // Fecha arquivo para garantir gravação
+    } else {                                  // Caso falhe ao abrir arquivo
+        printf("Erro ao abrir o arquivo de log.\n"); // Exibe mensagem de erro
     }
 }
-// Cadastra um novo aluno no arquivo
+// Função para cadastrar novo aluno no sistema
 void cadastrarAluno(FILE *arq) {
-    if (arq == NULL) {
-        printf("Erro ao abrir o arquivo de alunos.\n"); // Verifica se o arquivo foi aberto corretamente
-        return;
+    if (arq == NULL) {                                   // Valida se arquivo foi aberto corretamente
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Mensagem de erro para arquivo inválido
+        return;                                          // Encerra função se arquivo inválido
     }
 
-    Aluno aluno; // Cria uma estrutura Aluno
-    printf("\nCadastrar Aluno\n");
-    printf("Nome: ");
-    scanf("%s", aluno.nome); // Lê o nome do aluno
-    printf("Matricula: ");
-    scanf("%d", &aluno.matricula); // Lê a matrícula
-    printf("Disciplina: ");
-    scanf("%s", aluno.disciplina); // Lê a disciplina
-    printf("Email: ");
-    scanf("%s", aluno.email); // Lê o email
-    aluno.qtdDisciplinas = 0; // Inicializa o número de disciplinas do aluno
+    Aluno aluno;                              // Declara estrutura para dados do novo aluno
+    printf("\nCadastrar Aluno\n");           // Exibe cabeçalho da operação
+    printf("Nome: ");                        // Solicita nome do aluno
+    scanf("%s", aluno.nome);                 // Lê nome digitado pelo usuário
+    printf("Matricula: ");                   // Solicita número de matrícula
+    scanf("%d", &aluno.matricula);           // Lê matrícula como número inteiro
+    printf("Disciplina: ");                  // Solicita disciplina principal
+    scanf("%s", aluno.disciplina);           // Lê nome da disciplina
+    printf("Email: ");                       // Solicita endereço de email
+    scanf("%s", aluno.email);                // Lê email do aluno
+    aluno.qtdDisciplinas = 0;                // Inicializa contador de disciplinas como zero
 
-    fwrite(&aluno, sizeof(Aluno), 1, arq); // Grava o aluno no arquivo
+    fwrite(&aluno, sizeof(Aluno), 1, arq);   // Grava estrutura completa do aluno no arquivo
 
-    printf("Aluno cadastrado com sucesso!\n");
+    printf("Aluno cadastrado com sucesso!\n"); // Confirma sucesso da operação
 }
 
 
 
-// Lista todos os alunos presentes no arquivo
+// Função para listar todos os alunos cadastrados em formato tabular
 void listarAlunos(FILE *arq) {
-    if (arq == NULL) {
-        printf("Erro ao abrir o arquivo de alunos.\n"); // Verifica se o arquivo foi aberto corretamente
-        return;
+    if (arq == NULL) {                                   // Verifica se arquivo está válido
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Exibe erro se arquivo inválido
+        return;                                          // Encerra função em caso de erro
     }
 
-    Aluno aluno; // Estrutura para leitura
-    int contador = 0; // Contador de alunos
+    Aluno aluno;        // Estrutura para leitura temporária de cada aluno
+    int contador = 0;   // Contador para numerar alunos na listagem
     
-    // Imprime o cabeçalho da tabela
-    printf("\n");
+    // Imprime cabeçalho decorativo da tabela
+    printf("\n");       // Linha em branco para espaçamento
     printf("+==================================================================================+\n");
     printf("|                                  LISTA DE ALUNOS                                |\n");
     printf("+==================================================================================+\n");
     
-    // Verifica se há alunos no arquivo
-    fseek(arq, 0, SEEK_END); // Vai para o final do arquivo
-    long tamanhoArquivo = ftell(arq); // Obtém o tamanho do arquivo
-    int totalAlunos = tamanhoArquivo / sizeof(Aluno); // Calcula o total de alunos
-    fseek(arq, 0, SEEK_SET); // Volta para o início
+    // Calcula total de alunos para estatísticas
+    fseek(arq, 0, SEEK_END);                            // Move ponteiro para final do arquivo
+    long tamanhoArquivo = ftell(arq);                   // Obtém tamanho total em bytes
+    int totalAlunos = tamanhoArquivo / sizeof(Aluno);   // Calcula número de registros
+    fseek(arq, 0, SEEK_SET);                            // Retorna ponteiro ao início
     
-    if (totalAlunos == 0) {
+    if (totalAlunos == 0) {                             // Verifica se há alunos cadastrados
         printf("|                          Nenhum aluno cadastrado                            |\n");
         printf("+==================================================================================+\n");
-        return;
+        return;                                         // Encerra se não há dados
     }
     
+    // Exibe estatística do total de alunos
     printf("| Total de alunos cadastrados: %-3d                                              |\n", totalAlunos);
     printf("+==================================================================================+\n");
     
-    // Lê cada aluno do arquivo até o final
-    while (fread(&aluno, sizeof(Aluno), 1, arq)) {
-        contador++; // Incrementa o contador
+    // Loop principal para leitura e exibição de cada aluno
+    while (fread(&aluno, sizeof(Aluno), 1, arq)) {      // Lê próximo aluno do arquivo
+        contador++;                                      // Incrementa contador de alunos listados
         
+        // Exibe dados principais do aluno em formato tabular
         printf("| %-3d | %-25s | Matric: %-8d | %-25s |\n", 
-               contador, aluno.nome, aluno.matricula, aluno.email); // Imprime dados principais
+               contador, aluno.nome, aluno.matricula, aluno.email);
         
-        // Exibe as disciplinas do aluno
-        printf("|     | Disciplinas: ");
-        if (aluno.qtdDisciplinas > 0) {
-            for (int j = 0; j < aluno.qtdDisciplinas; j++) {
-                printf("%d", aluno.disciplinas[j]); // Imprime cada disciplina
-                if (j < aluno.qtdDisciplinas - 1) printf(", ");
+        // Prepara exibição das disciplinas matriculadas
+        printf("|     | Disciplinas: ");                // Rótulo para lista de disciplinas
+        if (aluno.qtdDisciplinas > 0) {                 // Verifica se há disciplinas cadastradas
+            for (int j = 0; j < aluno.qtdDisciplinas; j++) { // Loop pelas disciplinas do aluno
+                printf("%d", aluno.disciplinas[j]);     // Exibe código da disciplina
+                if (j < aluno.qtdDisciplinas - 1) printf(", "); // Adiciona vírgula entre códigos
             }
-        } else {
-            printf("Nenhuma disciplina cadastrada"); // Caso não tenha disciplinas
+        } else {                                        // Caso não tenha disciplinas
+            printf("Nenhuma disciplina cadastrada");   // Mensagem informativa
         }
         
-        printf("%*s|\n", 64, ""); // Completa a linha
+        printf("%*s|\n", 64, "");                       // Completa linha com espaços e borda
         
-        // Linha separadora entre alunos (exceto no último)
-        if (contador < totalAlunos) {
+        // Adiciona linha separadora entre alunos (exceto no último)
+        if (contador < totalAlunos) {                   // Verifica se não é o último aluno
             printf("+-----+---------------------------+--------------+---------------------------+\n");
         }
     }
     
-    // Rodapé
+    // Rodapé da tabela com estatísticas
     printf("+==================================================================================+\n");
-    printf("Total de alunos listados: %d\n", contador);
+    printf("Total de alunos listados: %d\n", contador); // Confirma quantidade exibida
 }
 
 
 
+// Função para sincronizar dados do arquivo com o disco
 void salvarAlunos(FILE *arq) {
-    if (arq == NULL) {
-        printf("Erro ao abrir o arquivo de alunos.\n");
-        return;
+    if (arq == NULL) {                               // Verifica se arquivo está válido
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Mensagem de erro
+        return;                                      // Encerra se arquivo inválido
     }
 
-    // Esta função agora apenas sincroniza o arquivo (flush)
-    // Dados já estão sendo gravados diretamente no arquivo
-    clock_t inicio = clock();
+    // Inicia medição de tempo para estatísticas de performance
+    clock_t inicio = clock();                       // Marca tempo inicial da operação
     
-    // Força a sincronização dos dados com o disco
-    fflush(arq);
+    // Força sincronização imediata dos dados com disco
+    fflush(arq);                                    // Força gravação do buffer no disco
     
-    // Obtém estatísticas do arquivo
-    fseek(arq, 0, SEEK_END);
-    long tamanhoArquivo = ftell(arq);
-    int totalAlunos = tamanhoArquivo / sizeof(Aluno);
+    // Coleta estatísticas do arquivo para relatório
+    fseek(arq, 0, SEEK_END);                        // Move ponteiro para final
+    long tamanhoArquivo = ftell(arq);               // Obtém tamanho em bytes
+    int totalAlunos = tamanhoArquivo / sizeof(Aluno); // Calcula número de registros
     
-    clock_t fim = clock();
-    double tempoGasto = (double)(fim - inicio) / CLOCKS_PER_SEC;
+    clock_t fim = clock();                          // Marca tempo final da operação
+    double tempoGasto = (double)(fim - inicio) / CLOCKS_PER_SEC; // Calcula tempo decorrido
     
+    // Exibe relatório da operação de sincronização
     printf("Arquivo sincronizado com sucesso!\n");
     printf("Total de alunos no arquivo: %d\n", totalAlunos);
     printf("Tamanho do arquivo: %ld bytes\n", tamanhoArquivo);
     printf("Tempo de sincronizacao: %.2f ms\n", tempoGasto * 1000);
     
-    // Log da operação
-    char logMsg[256];
+    // Registra operação no log para auditoria
+    char logMsg[256];                               // Buffer para mensagem de log
     snprintf(logMsg, sizeof(logMsg), "Sincronizacao Arquivo: %d alunos, %ld bytes, %.2f ms", 
              totalAlunos, tamanhoArquivo, tempoGasto * 1000);
-    registrarLog(logMsg);
+    registrarLog(logMsg);                           // Grava no arquivo de log
 
-    printf("Dados dos alunos sincronizados com sucesso!\n");
+    printf("Dados dos alunos sincronizados com sucesso!\n"); // Confirmação final
 }
 
 
+// Função para verificar integridade e estatísticas do arquivo de alunos
 void carregarAlunos(FILE *arq) {
-    if (arq != NULL) {
-        clock_t inicio = clock();
+    if (arq != NULL) {                              // Verifica se arquivo está válido
+        clock_t inicio = clock();                   // Inicia medição de tempo
         
-        // Obtém informações do arquivo sem carregar na memória
-        fseek(arq, 0, SEEK_END);
-        long tamanhoArquivo = ftell(arq);
-        int totalAlunos = tamanhoArquivo / sizeof(Aluno);
-        fseek(arq, 0, SEEK_SET);
+        // Analisa arquivo sem carregar dados na memória principal
+        fseek(arq, 0, SEEK_END);                    // Move ponteiro para final
+        long tamanhoArquivo = ftell(arq);           // Obtém tamanho total do arquivo
+        int totalAlunos = tamanhoArquivo / sizeof(Aluno); // Calcula quantidade de registros
+        fseek(arq, 0, SEEK_SET);                    // Retorna ponteiro ao início
         
-        clock_t fim = clock();
-        double tempoGasto = (double)(fim - inicio) / CLOCKS_PER_SEC;
+        clock_t fim = clock();                      // Finaliza medição de tempo
+        double tempoGasto = (double)(fim - inicio) / CLOCKS_PER_SEC; // Calcula duração
         
+        // Exibe relatório de verificação do arquivo
         printf("Arquivo de alunos verificado com sucesso!\n");
         printf("Total de alunos no arquivo: %d\n", totalAlunos);
         printf("Tamanho do arquivo: %ld bytes\n", tamanhoArquivo);
         printf("Tempo de verificacao: %.2f ms\n", tempoGasto * 1000);
         
-        // Log da operação
-        char logMsg[256];
+        // Registra verificação no log do sistema
+        char logMsg[256];                           // Buffer para mensagem de log
         snprintf(logMsg, sizeof(logMsg), "Verificacao Arquivo: %d alunos, %ld bytes, %.2f ms", 
                  totalAlunos, tamanhoArquivo, tempoGasto * 1000);
-        registrarLog(logMsg);
+        registrarLog(logMsg);                       // Grava operação no log
         
-        // Não carrega na memória - apenas verifica o arquivo
+        // Informa estratégia de memória utilizada
         printf("NOTA: Dados mantidos em memoria secundaria (arquivo).\n");
-    } else {
-        printf("Erro ao abrir o arquivo de alunos.\n");
+    } else {                                        // Caso arquivo seja inválido
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Mensagem de erro
     }
 }
 
+// Algoritmo de busca binária otimizado para arquivos (requer dados ordenados)
 int buscaBinariaAluno(FILE *arq, int matricula) {
-    if (arq == NULL) {
-        printf("Erro ao abrir o arquivo de alunos.\n");
-        return -1;
+    if (arq == NULL) {                               // Valida se arquivo está aberto
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Mensagem de erro
+        return -1;                                   // Retorna código de erro
     }
 
-    clock_t comeco, final;
-    double tempoGasto;
-    int comparacoes = 0; // Contador de comparações
-    comeco = clock();
+    clock_t comeco, final;                          // Variáveis para medição de tempo
+    double tempoGasto;                              // Tempo total de execução
+    int comparacoes = 0;                            // Contador de comparações realizadas
+    comeco = clock();                               // Marca início da operação
 
-    int inicio = 0, fim;
+    int inicio = 0, fim;                            // Limites do intervalo de busca
     
-    // Obtém o número total de alunos no arquivo para definir o valor de "fim"
-    fseek(arq, 0, SEEK_END); // Move o ponteiro do arquivo para o final
-    long tamanhoArquivo = ftell(arq);  // Obtém o tamanho do arquivo
-    fim = tamanhoArquivo / sizeof(Aluno) - 1; // Define "fim" como o índice do último aluno
+    // Calcula total de registros para definir limite superior
+    fseek(arq, 0, SEEK_END);                        // Move ponteiro para final
+    long tamanhoArquivo = ftell(arq);               // Obtém tamanho em bytes
+    fim = tamanhoArquivo / sizeof(Aluno) - 1;       // Calcula índice do último registro
 
-    while (inicio <= fim) {
-        int meio = (inicio + fim) / 2;
+    // Loop principal do algoritmo de busca binária
+    while (inicio <= fim) {                         // Enquanto intervalo for válido
+        int meio = (inicio + fim) / 2;              // Calcula posição central
 
-        // Posiciona o ponteiro do arquivo na posição do "meio" para ler o aluno
-        fseek(arq, meio * sizeof(Aluno), SEEK_SET);
-        Aluno aluno;
-        fread(&aluno, sizeof(Aluno), 1, arq);  // Lê o aluno do arquivo
+        // Posiciona arquivo e lê registro do meio
+        fseek(arq, meio * sizeof(Aluno), SEEK_SET); // Move ponteiro para posição calculada
+        Aluno aluno;                                // Estrutura para leitura temporária
+        fread(&aluno, sizeof(Aluno), 1, arq);       // Lê dados do aluno
 
-        comparacoes++; // Incrementa a contagem de comparações
+        comparacoes++;                              // Incrementa contador de comparações
 
-        if (aluno.matricula == matricula) {
-            final = clock();
-            tempoGasto = (double)(final - comeco) / CLOCKS_PER_SEC;
-            char logMsg[256];
+        if (aluno.matricula == matricula) {         // Verifica se encontrou a matrícula
+            final = clock();                        // Marca fim da operação
+            tempoGasto = (double)(final - comeco) / CLOCKS_PER_SEC; // Calcula tempo
+            char logMsg[256];                       // Buffer para log
             snprintf(logMsg, sizeof(logMsg), "Busca Binária: %d comparações, tempo: %.2f ms", comparacoes, tempoGasto * 1000);
-            registrarLog(logMsg); // Registra no arquivo log
-            return meio;  // Retorna o índice do aluno encontrado
-        } else if (aluno.matricula < matricula) {
-            inicio = meio + 1;
-        } else {
-            fim = meio - 1;
+            registrarLog(logMsg);                   // Registra estatísticas no log
+            return meio;                            // Retorna posição encontrada
+        } else if (aluno.matricula < matricula) {   // Se matrícula atual é menor
+            inicio = meio + 1;                      // Busca na metade superior
+        } else {                                    // Se matrícula atual é maior
+            fim = meio - 1;                         // Busca na metade inferior
         }
     }
 
-    final = clock();
-    tempoGasto = (double)(final - comeco) / CLOCKS_PER_SEC;
-    char logMsg[256];
+    // Registro não encontrado - gera log e retorna erro
+    final = clock();                                // Marca fim da operação
+    tempoGasto = (double)(final - comeco) / CLOCKS_PER_SEC; // Calcula tempo total
+    char logMsg[256];                               // Buffer para mensagem de log
     snprintf(logMsg, sizeof(logMsg), "Busca Binária: %d comparações, tempo: %.2f ms (não encontrado)", comparacoes, tempoGasto * 1000);
-    registrarLog(logMsg); // Registra no arquivo log
+    registrarLog(logMsg);                           // Registra busca sem sucesso
 
-    return -1;  // Se não encontrar o aluno, retorna -1
+    return -1;                                      // Retorna código de "não encontrado"
 }
 
 
@@ -272,51 +280,52 @@ int buscaSequencialAluno(FILE *arq, int matricula) {
 
 
 
-// Função de ordenação Bubble Sort para alunos - Versão Memória Secundária
+// Função de ordenação Bubble Sort otimizada para memória secundária
 void bubbleSortAlunos(FILE *arq) {
-    if (arq == NULL) {
-        printf("Erro ao abrir o arquivo de alunos.\n");
-        return;
+    if (arq == NULL) {                              // Valida se arquivo está aberto
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Exibe erro se arquivo inválido
+        return;                                     // Encerra execução da função
     }
 
-    clock_t inicio = clock();
+    clock_t inicio = clock();                       // Marca início para cronometragem
     
-    // Calcula o número total de alunos no arquivo
-    fseek(arq, 0, SEEK_END);
-    long tamanhoArquivo = ftell(arq);
-    int qtdAlunos = tamanhoArquivo / sizeof(Aluno);
+    // Calcula número total de registros no arquivo
+    fseek(arq, 0, SEEK_END);                        // Move ponteiro para final do arquivo
+    long tamanhoArquivo = ftell(arq);               // Obtém tamanho em bytes
+    int qtdAlunos = tamanhoArquivo / sizeof(Aluno); // Converte para número de registros
     
-    printf("Iniciando ordenacao de %d alunos usando memoria secundaria...\n", qtdAlunos);
+    printf("Iniciando ordenacao de %d alunos usando memoria secundaria...\n", qtdAlunos); // Informa início
     
-    int trocas = 0;
-    int comparacoes = 0;
+    int trocas = 0;                                 // Contador de trocas realizadas
+    int comparacoes = 0;                            // Contador de comparações feitas
     
-    // Bubble Sort otimizado para trabalhar diretamente no arquivo
-    for (int i = 0; i < qtdAlunos - 1; i++) {
-        int houveTroca = 0;
+    // Loop externo do Bubble Sort (passadas sobre o arquivo)
+    for (int i = 0; i < qtdAlunos - 1; i++) {      // Para cada passada
+        int houveTroca = 0;                         // Flag para otimização (detecta se houve troca)
         
-        for (int j = 0; j < qtdAlunos - 1 - i; j++) {
-            // Lê dois alunos consecutivos do arquivo
-            Aluno aluno1, aluno2;
+        // Loop interno compara elementos adjacentes
+        for (int j = 0; j < qtdAlunos - 1 - i; j++) { // Elementos não ordenados restantes
+            // Estruturas temporárias para comparação
+            Aluno aluno1, aluno2;                   // Armazena dois registros consecutivos
             
-            // Posiciona e lê o primeiro aluno
-            fseek(arq, j * sizeof(Aluno), SEEK_SET);
-            fread(&aluno1, sizeof(Aluno), 1, arq);
+            // Lê primeiro aluno da posição j
+            fseek(arq, j * sizeof(Aluno), SEEK_SET); // Posiciona no registro j
+            fread(&aluno1, sizeof(Aluno), 1, arq);  // Lê dados do primeiro aluno
             
-            // Lê o segundo aluno
-            fread(&aluno2, sizeof(Aluno), 1, arq);
+            // Lê segundo aluno da posição j+1
+            fread(&aluno2, sizeof(Aluno), 1, arq);  // Lê próximo registro sequencialmente
             
-            comparacoes++;
+            comparacoes++;                          // Incrementa contador de comparações
             
-            // Se estão fora de ordem, troca
-            if (aluno1.matricula > aluno2.matricula) {
-                // Reposiciona para escrever na ordem correta
-                fseek(arq, j * sizeof(Aluno), SEEK_SET);
-                fwrite(&aluno2, sizeof(Aluno), 1, arq);
-                fwrite(&aluno1, sizeof(Aluno), 1, arq);
+            // Verifica se está fora de ordem (critério: matrícula)
+            if (aluno1.matricula > aluno2.matricula) { // Se primeiro > segundo (ordem crescente)
+                // Realiza troca reescrevendo na ordem correta
+                fseek(arq, j * sizeof(Aluno), SEEK_SET); // Volta para posição j
+                fwrite(&aluno2, sizeof(Aluno), 1, arq); // Escreve segundo na posição j
+                fwrite(&aluno1, sizeof(Aluno), 1, arq); // Escreve primeiro na posição j+1
                 
-                trocas++;
-                houveTroca = 1;
+                trocas++;                           // Incrementa contador de trocas
+                houveTroca = 1;                     // Marca que houve troca nesta passada
             }
         }
         
@@ -523,82 +532,82 @@ void cancelarMatriculaAluno(FILE *arq, int matricula) {
     printf("AVISO: Arquivo foi fechado. Reabra o arquivo no menu principal.\n");
 }
 
-// Função para gerar partições usando seleção natural
+// Função para gerar partições usando algoritmo de seleção natural
 void gerarParticoesSelecaoNatural(FILE *arq, int tamanhoMemoria) {
-    // Verifica se o arquivo foi aberto corretamente
-    if (arq == NULL) { // Verifica se arquivo está aberto
-        printf("Erro ao abrir o arquivo de alunos.\n"); // Exibe erro de abertura
-        return; // Encerra função se arquivo inválido
+    // Valida se arquivo está disponível para processamento
+    if (arq == NULL) {                               // Verifica se arquivo foi aberto
+        printf("Erro ao abrir o arquivo de alunos.\n"); // Mensagem de erro
+        return;                                      // Encerra função
     }
 
-    // Cria buffer para armazenar alunos em memória
+    // Aloca buffer dinâmico para processamento em memória
     Aluno *buffer = (Aluno*)malloc(tamanhoMemoria * sizeof(Aluno)); // Buffer para alunos em memória
-    if (buffer == NULL) { // Verifica alocação do buffer
-        printf("Erro ao alocar memória para o buffer.\n"); // Exibe erro de alocação
-        return; // Encerra função se falhar
+    if (buffer == NULL) {                            // Verifica se alocação foi bem-sucedida
+        printf("Erro ao alocar memória para o buffer.\n"); // Erro de alocação
+        return;                                      // Encerra se falhar na alocação
     }
 
-    int numParticao = 0; // Número da partição atual
-    int alunosLidos = 0; // Quantidade de alunos lidos no bloco
-    int totalAlunos = 0; // Total de alunos no arquivo
-    clock_t inicioGeral = clock(); // Marca início para medir tempo
+    int numParticao = 0;                             // Contador de partições geradas
+    int alunosLidos = 0;                             // Alunos carregados no buffer atual
+    int totalAlunos = 0;                             // Total de registros no arquivo
+    clock_t inicioGeral = clock();                   // Marca tempo de início do processo
 
-    // Calcula o número total de alunos no arquivo
-    fseek(arq, 0, SEEK_END); // Move ponteiro para final do arquivo
-    long tamanhoArquivo = ftell(arq); // Tamanho total do arquivo em bytes
-    totalAlunos = tamanhoArquivo / sizeof(Aluno); // Calcula total de registros
-    fseek(arq, 0, SEEK_SET); // Retorna ponteiro ao início
+    // Determina tamanho total do arquivo para planejamento
+    fseek(arq, 0, SEEK_END);                         // Move ponteiro para final
+    long tamanhoArquivo = ftell(arq);                // Obtém tamanho em bytes
+    totalAlunos = tamanhoArquivo / sizeof(Aluno);    // Converte para número de registros
+    fseek(arq, 0, SEEK_SET);                         // Retorna ao início para leitura
 
-    printf("\nIniciando geração de partições com seleção natural...\n"); // Informa início do processo
-    printf("Total de alunos: %d\n", totalAlunos); // Mostra total de alunos
-    printf("Tamanho da memória: %d alunos\n", tamanhoMemoria); // Mostra tamanho do buffer
+    printf("\nIniciando geração de partições com seleção natural...\n"); // Informa usuário
+    printf("Total de alunos: %d\n", totalAlunos);   // Exibe quantidade total
+    printf("Tamanho da memória: %d alunos\n", tamanhoMemoria); // Mostra capacidade do buffer
 
-    // Log detalhado do início
-    char logMsg[512]; // Buffer para log
-    snprintf(logMsg, sizeof(logMsg), "=== INICIO SELECAO NATURAL ==="); // Log início
-    registrarLog(logMsg); // Grava log
+    // Registra início do processo no sistema de log
+    char logMsg[512];                                // Buffer para mensagens de log
+    snprintf(logMsg, sizeof(logMsg), "=== INICIO SELECAO NATURAL ==="); // Cabeçalho do log
+    registrarLog(logMsg);                            // Grava no arquivo de log
     snprintf(logMsg, sizeof(logMsg), "Total de alunos a processar: %d", totalAlunos); // Log quantidade
-    registrarLog(logMsg); // Grava log
-    snprintf(logMsg, sizeof(logMsg), "Tamanho da memoria: %d alunos", tamanhoMemoria); // Log memória
-    registrarLog(logMsg); // Grava log
+    registrarLog(logMsg);                            // Grava informação
+    snprintf(logMsg, sizeof(logMsg), "Tamanho da memoria: %d alunos", tamanhoMemoria); // Log capacidade
+    registrarLog(logMsg);                            // Registra configuração
 
-
-    // Seleção Natural Verdadeira - Tamanhos de Partição Variáveis
-    // Lê todo o arquivo e gera partições com base em sequências crescentes
+    // === ALGORITMO DE SELEÇÃO NATURAL VERDADEIRA ===
+    // Gera partições com tamanhos variáveis baseados em sequências crescentes
     
-    Aluno alunoAtual, proximoAluno;
-    int temProximo = 0;
-    fseek(arq, 0, SEEK_SET);
+    Aluno alunoAtual, proximoAluno;                  // Estruturas para comparação de sequência
+    int temProximo = 0;                              // Flag para controle de leitura
+    fseek(arq, 0, SEEK_SET);                         // Garante início do arquivo
     
-    // Lê o primeiro aluno
-    if (fread(&alunoAtual, sizeof(Aluno), 1, arq) == 0) {
-        free(buffer);
-        return;
+    // Carrega primeiro registro para iniciar o processo
+    if (fread(&alunoAtual, sizeof(Aluno), 1, arq) == 0) { // Lê primeiro aluno
+        free(buffer);                                // Libera memória se arquivo vazio
+        return;                                      // Encerra se não há dados
     }
     
-    int alunosProcessados = 0;
+    int alunosProcessados = 0;                       // Contador de registros processados
     
-    while (alunosProcessados < totalAlunos) {
-        // Cria nova partição
-        char nomeArquivo[256];
-        snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", numParticao);
-        FILE *arquivoParticao = fopen(nomeArquivo, "wb");
-        if (arquivoParticao == NULL) {
-            printf("Erro ao criar particao %s\n", nomeArquivo);
-            free(buffer);
-            return;
+    // Loop principal: processa todos os alunos do arquivo
+    while (alunosProcessados < totalAlunos) {        // Até processar todos os registros
+        // Cria novo arquivo de partição para sequência crescente
+        char nomeArquivo[256];                       // Buffer para nome do arquivo
+        snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", numParticao); // Nome único
+        FILE *arquivoParticao = fopen(nomeArquivo, "wb"); // Abre arquivo para escrita binária
+        if (arquivoParticao == NULL) {               // Verifica se criação foi bem-sucedida
+            printf("Erro ao criar particao %s\n", nomeArquivo); // Erro de criação
+            free(buffer);                            // Libera memória alocada
+            return;                                  // Encerra processo
         }
         
-        int alunosNaParticao = 0;
+        int alunosNaParticao = 0;                    // Contador de alunos na partição atual
         
-        // Aplica seleção natural - varia tamanho baseado nos dados
-        while (alunosProcessados < totalAlunos) {
+        // Aplica lógica de seleção natural: sequências crescentes de matrículas
+        while (alunosProcessados < totalAlunos) {    // Processa até fim do arquivo
             // Escreve aluno atual na partição
-            fwrite(&alunoAtual, sizeof(Aluno), 1, arquivoParticao);
-            alunosNaParticao++;
-            alunosProcessados++;
+            fwrite(&alunoAtual, sizeof(Aluno), 1, arquivoParticao); // Grava registro
+            alunosNaParticao++;                      // Incrementa contador da partição
+            alunosProcessados++;                     // Incrementa total processado
             
-            // Lê próximo aluno
+            // Lê próximo aluno para verificar continuidade da sequência
             if (fread(&proximoAluno, sizeof(Aluno), 1, arq) == 0) {
                 // Final do arquivo
                 break;
@@ -783,62 +792,65 @@ void intercalarGrupoParticoes(char **nomesArquivos, int qtdArquivos, FILE *arqui
     free(particoes);
 }
 
-// Função de intercalação ótima com suporte para múltiplas fases
+// Função de intercalação ótima com suporte para múltiplas fases e estratégias adaptáveis
 void intercalacaoOtima(FILE *arquivoDestino) {
-    if (arquivoDestino == NULL) { // Verifica se arquivo de destino está aberto
+    if (arquivoDestino == NULL) {                    // Valida arquivo de destino
         printf("Erro: arquivo de destino nao fornecido.\n"); // Mensagem de erro
-        return; // Encerra função se inválido
+        return;                                      // Encerra execução
     }
     
     printf("\nIniciando intercalacao otima das particoes...\n"); // Informa início do processo
     
-    // Log do início da intercalação
-    char logMsg[512]; // Buffer para log
-    snprintf(logMsg, sizeof(logMsg), "=== INICIO INTERCALACAO OTIMA ==="); 
-    registrarLog(logMsg); // Grava log
+    // Registra início da intercalação no sistema de log
+    char logMsg[512];                                // Buffer para mensagens de log
+    snprintf(logMsg, sizeof(logMsg), "=== INICIO INTERCALACAO OTIMA ==="); // Cabeçalho
+    registrarLog(logMsg);                            // Grava no log
     
-    // Contar quantas partições existem
-    int numParticoes = 0; // Contador de partições
-    char nomeArquivo[256]; // Buffer para nome de arquivo
+    // Fase de descoberta: conta quantas partições foram geradas
+    int numParticoes = 0;                            // Contador de partições encontradas
+    char nomeArquivo[256];                           // Buffer para nomes de arquivo
     
-    while (1) { // Conta quantas partições existem
-        snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", numParticoes); // Gera nome
-        FILE *teste = fopen(nomeArquivo, "rb"); // Tenta abrir partição
-        if (teste == NULL) { // Se não existe, encerra
-            break;
+    while (1) {                                      // Loop para contar partições
+        snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", numParticoes); // Gera nome sequencial
+        FILE *teste = fopen(nomeArquivo, "rb");      // Tenta abrir partição
+        if (teste == NULL) {                         // Se arquivo não existe
+            break;                                   // Termina contagem
         }
-        fclose(teste); // Fecha arquivo
-        numParticoes++; // Incrementa contador
+        fclose(teste);                               // Fecha arquivo de teste
+        numParticoes++;                              // Incrementa contador
     }
     
-    if (numParticoes == 0) { // Verifica se há partições
-        printf("Nenhuma particao encontrada. Execute primeiro a geracao de particoes.\n"); // Mensagem de erro
+    // Valida se há partições para processar
+    if (numParticoes == 0) {                         // Verifica se encontrou partições
+        printf("Nenhuma particao encontrada. Execute primeiro a geracao de particoes.\n"); // Erro
         snprintf(logMsg, sizeof(logMsg), "ERRO: Nenhuma particao encontrada"); // Log erro
-        registrarLog(logMsg); // Grava log
-        return; // Encerra função
+        registrarLog(logMsg);                        // Registra erro
+        return;                                      // Encerra função
     }
     
-    printf("Encontradas %d particoes para intercalar.\n", numParticoes); // Exibe quantidade
-    snprintf(logMsg, sizeof(logMsg), "Particoes a intercalar: %d", numParticoes); // Log quantidade
-    registrarLog(logMsg); // Grava log
+    printf("Encontradas %d particoes para intercalar.\n", numParticoes); // Informa quantidade
+    snprintf(logMsg, sizeof(logMsg), "Particoes a intercalar: %d", numParticoes); // Log descoberta
+    registrarLog(logMsg);                            // Grava informação
     
-    // Definir estratégia baseada no número de partições
-    const int MAX_ARQUIVOS_SIMULTANEOS = 200; // Limite de arquivos abertos
-    clock_t inicio = clock(); // Marca início para medir tempo
-    int totalAlunos = 0; // Contador de alunos intercalados
+    // Configuração de estratégia baseada em recursos disponíveis
+    const int MAX_ARQUIVOS_SIMULTANEOS = 200;       // Limite de descritores de arquivo
+    clock_t inicio = clock();                        // Marca início para cronometragem
+    int totalAlunos = 0;                             // Contador de registros intercalados
     
-    if (numParticoes <= MAX_ARQUIVOS_SIMULTANEOS) { // Se cabe tudo na RAM
-        printf("Usando intercalacao direta (%d particoes)...\n", numParticoes); // Informa modo direto
+    // === ESTRATÉGIA ADAPTÁVEL DE INTERCALAÇÃO ===
+    if (numParticoes <= MAX_ARQUIVOS_SIMULTANEOS) { // Se cabe na capacidade do sistema
+        printf("Usando intercalacao direta (%d particoes)...\n", numParticoes); // Informa estratégia
         
-        ControleParticao *particoes = (ControleParticao*)malloc(numParticoes * sizeof(ControleParticao)); // Aloca controle das partições
-        if (particoes == NULL) { // Verifica alocação
-            printf("Erro ao alocar memoria para intercalacao.\n"); // Mensagem de erro
-            return; // Encerra função
+        // Aloca estruturas de controle para cada partição
+        ControleParticao *particoes = (ControleParticao*)malloc(numParticoes * sizeof(ControleParticao)); // Array de controle
+        if (particoes == NULL) {                     // Verifica alocação de memória
+            printf("Erro ao alocar memoria para intercalacao.\n"); // Erro de memória
+            return;                                  // Encerra por falta de recursos
         }
         
-        // Abrir todas as partições
-        for (int i = 0; i < numParticoes; i++) { // Abre todas as partições
-            snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", i); // Gera nome
+        // Inicialização: abre todos os arquivos de partição simultaneamente
+        for (int i = 0; i < numParticoes; i++) {     // Para cada partição encontrada
+            snprintf(nomeArquivo, sizeof(nomeArquivo), "particoes\\particao_%d.dat", i); // Gera nome do arquivo
             particoes[i].arquivo = fopen(nomeArquivo, "rb"); // Abre arquivo
             particoes[i].numeroParticao = i; // Salva número
             if (particoes[i].arquivo != NULL) { // Se abriu
